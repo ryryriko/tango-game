@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="単語ゲーム">
+<meta name="theme-color" content="#faf9f5">
+<title>Claude / Markdown 単語ゲーム</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, Arial, sans-serif; background: #faf9f5; color: #141413; margin: 0; padding: 0; min-height: 100vh; }
+  .wrap { padding: 1rem; max-width: 560px; margin: 0 auto; padding-top: max(env(safe-area-inset-top), 1rem); padding-bottom: max(env(safe-area-inset-bottom), 1rem); }
+  h1 { font-size: 16px; font-weight: 500; color: #888; margin: 0 0 1rem; }
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .filter-btn { font-size: 12px; padding: 6px 12px; border-radius: 20px; border: 1px solid #ccc; background: #fff; cursor: pointer; color: #555; }
+  .filter-btn.active { background: #141413; color: #faf9f5; border-color: #141413; font-weight: 500; }
+  .score-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+  .score-val { font-size: 22px; font-weight: 500; }
+  .score-lbl { font-size: 12px; color: #888; }
+  .counter { font-size: 12px; color: #888; }
+  .progress { height: 4px; background: #e8e6dc; border-radius: 2px; margin-bottom: 1.25rem; }
+  .progress-bar { height: 4px; background: #1D9E75; border-radius: 2px; transition: width 0.4s; }
+  .word-card { background: #fff; border: 1px solid #e8e6dc; border-radius: 16px; padding: 1.25rem; margin-bottom: 1rem; }
+  .badge { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; margin-bottom: 0.75rem; }
+  .badge-md { background:#E6F1FB; color:#0C447C; }
+  .badge-ai { background:#EEEDFE; color:#3C3489; }
+  .badge-sk { background:#E1F5EE; color:#085041; }
+  .badge-gen { background:#FAEEDA; color:#633806; }
+  .word-main { font-size: 30px; font-weight: 500; margin-bottom: 0.25rem; }
+  .word-example { font-size: 13px; color: #888; font-style: italic; }
+  .step-label { font-size: 12px; font-weight: 500; color: #888; margin-bottom: 8px; }
+  .step-done { font-size: 13px; padding: 8px 12px; border-radius: 10px; margin-bottom: 8px; }
+  .step-done.ok { background: #E1F5EE; color: #085041; }
+  .step-done.ng { background: #FCEBEB; color: #791F1F; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 0.75rem; }
+  .cbtn { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 12px 10px; font-size: 13px; color: #141413; cursor: pointer; text-align: left; line-height: 1.4; -webkit-appearance: none; }
+  .cbtn:active:not(:disabled) { background: #f0eeea; }
+  .cbtn.correct { background: #E1F5EE; border-color: #0F6E56; color: #085041; }
+  .cbtn.wrong { background: #FCEBEB; border-color: #A32D2D; color: #791F1F; }
+  .cbtn:disabled { cursor: default; opacity: 1; }
+  .feedback { font-size: 13px; min-height: 1.4rem; margin-bottom: 0.5rem; color: #555; }
+
+  /* 不正解解説カード */
+  .explain-wrap { margin-bottom: 0.75rem; }
+  .explain-card { border-radius: 12px; padding: 12px; margin-bottom: 6px; font-size: 13px; line-height: 1.6; }
+  .explain-card.wrong-card { background: #FCEBEB; border: 1px solid #f5c1c1; }
+  .explain-card.correct-card { background: #E1F5EE; border: 1px solid #9FE1CB; }
+  .explain-label { font-size: 11px; font-weight: 500; margin-bottom: 4px; }
+  .explain-label.wrong-label { color: #A32D2D; }
+  .explain-label.correct-label { color: #085041; }
+  .explain-word { font-weight: 500; font-size: 14px; }
+  .explain-desc { color: #444; margin-top: 2px; }
+
+  .next-btn { width: 100%; padding: 14px; border-radius: 12px; border: none; background: #141413; color: #faf9f5; font-size: 15px; cursor: pointer; display: none; -webkit-appearance: none; margin-top: 0.25rem; }
+  .result-card { text-align: center; padding: 2rem 1rem; background: #fff; border: 1px solid #e8e6dc; border-radius: 16px; }
+  .result-score { font-size: 56px; font-weight: 500; margin: 0.5rem 0; }
+  .result-sub { font-size: 14px; color: #888; margin-bottom: 0.5rem; }
+  .result-msg { font-size: 15px; color: #555; margin-bottom: 1.5rem; }
+  .restart-btn { padding: 14px 36px; border-radius: 12px; border: none; background: #141413; color: #faf9f5; font-size: 15px; cursor: pointer; -webkit-appearance: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Claude / Markdown 単語ゲーム</h1>
+  <div class="filter-bar" id="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all',this)">全部</button>
+    <button class="filter-btn" onclick="setFilter('md',this)">Markdown</button>
+    <button class="filter-btn" onclick="setFilter('ai',this)">Claude / AI</button>
+    <button class="filter-btn" onclick="setFilter('sk',this)">スキル</button>
+    <button class="filter-btn" onclick="setFilter('gen',this)">一般技術</button>
+  </div>
+  <div id="game-area"></div>
+</div>
+<script>
+const words = [
+  { word:"heading", meaning:"見出し", example:"# is used for a heading", context:"文書の章タイトルや節のタイトルを示すときに使う。#の数で大きさが変わる", category:"md" },
+  { word:"bold", meaning:"太字", example:"**text** makes it bold", context:"特に注目してほしい単語や重要な概念を強調するときに使う", category:"md" },
+  { word:"italic", meaning:"斜体", example:"_text_ makes it italic", context:"書籍名・作品名・外来語などを区別したいときや、軽い強調に使う", category:"md" },
+  { word:"bullet point", meaning:"箇条書きの点", example:"- item creates a bullet point", context:"順番に意味がない複数の項目を並べるときに使う", category:"md" },
+  { word:"indent", meaning:"字下げ", example:"Use spaces to indent", context:"番号付きリストの説明文を親項目に紐づけるためにスペースを入れる", category:"md" },
+  { word:"soft break", meaning:"ソフト改行", example:"Two spaces at line end", context:"詩や住所など、段落を分けずに行だけ変えたいときに行末スペース2つで使う", category:"md" },
+  { word:"hard break", meaning:"空行による改行", example:"Empty line = hard break", context:"新しい段落を始めるときに空行を1行入れる", category:"md" },
+  { word:"reference link", meaning:"参照リンク", example:"[text][ref] is a reference link", context:"同じURLを文中で何度も使うときに、文末にまとめて書いて管理しやすくする", category:"md" },
+  { word:"inline link", meaning:"インラインリンク", example:"[text](url) is an inline link", context:"リンクを1回だけ使う場合に、テキストのすぐ後ろにURLを書く", category:"md" },
+  { word:"paragraph", meaning:"段落", example:"A paragraph is a block of text", context:"関連する文をひとまとまりにした文章の単位。空行で区切る", category:"md" },
+  { word:"syntax", meaning:"記法・書き方のルール", example:"Markdown syntax uses # for headings", context:"#や*などの記号がどんな意味を持つかを定めたルール全体を指す", category:"md" },
+  { word:"render", meaning:"表示する・変換する", example:"The browser renders Markdown", context:"Markdownの記号を解釈して、見出しやリストとして画面に表示する処理", category:"md" },
+  { word:"preview", meaning:"プレビュー", example:"Check the preview on the right", context:"編集画面で入力した内容が実際にどう表示されるかを確認する画面", category:"md" },
+  { word:"blockquote", meaning:"引用ブロック", example:"> text creates a blockquote", context:"他の文章や発言を引用するときに>を使って視覚的に区別する", category:"md" },
+  { word:"code block", meaning:"コードブロック", example:"``` wraps a code block", context:"プログラムコードやコマンドをそのまま表示するための枠", category:"md" },
+  { word:"horizontal rule", meaning:"水平線", example:"--- creates a horizontal rule", context:"文書内でセクションを視覚的に区切りたいときに使う線", category:"md" },
+  { word:"ordered list", meaning:"番号付きリスト", example:"1. 2. 3. is an ordered list", context:"手順や優先順位など、順番に意味がある項目を並べるときに使う", category:"md" },
+  { word:"unordered list", meaning:"番号なしリスト", example:"- or * creates an unordered list", context:"順番に意味がない項目を並べるときに-や*を使う", category:"md" },
+  { word:"underscore", meaning:"アンダースコア", example:"_ is called an underscore", context:"Markdownではイタリックや太字の記号として使われる", category:"md" },
+  { word:"asterisk", meaning:"アスタリスク", example:"* is called an asterisk", context:"Markdownでは太字・イタリック・箇条書きの記号として使われる", category:"md" },
+  { word:"backtick", meaning:"バッククォート", example:"` is called a backtick", context:"インラインコードやコードブロックを示すために使う記号", category:"md" },
+  { word:"front matter", meaning:"ファイル冒頭の設定情報", example:"--- wraps front matter in SKILL.md", context:"SKILL.mdの先頭で---に囲まれた部分。スキルの名前や説明を書く", category:"md" },
+  { word:"prompt", meaning:"AIへの指示文", example:"A good prompt is clear and specific", context:"Claudeに何をしてほしいかを伝える文章全体。質問・依頼・条件が含まれる", category:"ai" },
+  { word:"model", meaning:"AIモデル", example:"Claude is an AI model", context:"ClaudeやGPTなど、AIの中核となる学習済みプログラムを指す", category:"ai" },
+  { word:"context", meaning:"文脈・背景情報", example:"Give Claude more context", context:"Claudeが正確に答えるために必要な前提情報や状況の説明", category:"ai" },
+  { word:"output", meaning:"出力・結果", example:"The model's output was accurate", context:"Claudeが返してきた文章や答えのこと", category:"ai" },
+  { word:"input", meaning:"入力", example:"Type your input in the chat", context:"ユーザーがClaudeに送るメッセージや質問のこと", category:"ai" },
+  { word:"instruction", meaning:"指示", example:"Follow the instruction carefully", context:"Claudeに特定の動作や形式で答えるよう求めるときに使う", category:"ai" },
+  { word:"response", meaning:"返答", example:"Claude's response was helpful", context:"Claudeがユーザーのメッセージに対して返してくる文章", category:"ai" },
+  { word:"token", meaning:"AIが処理する文字の単位", example:"Long texts use many tokens", context:"AIが文章を処理するときの内部的な単位。文字数やコストに関係する", category:"ai" },
+  { word:"hallucination", meaning:"AIが事実と異なる情報を生成すること", example:"AI hallucination is a known problem", context:"Claudeが自信を持って間違った情報を答えてしまう現象", category:"ai" },
+  { word:"system prompt", meaning:"AIへの事前設定指示", example:"The system prompt sets Claude's role", context:"会話が始まる前にClaudeの役割や動作ルールをあらかじめ設定する指示文", category:"ai" },
+  { word:"role", meaning:"役割", example:"Give Claude a role for better results", context:"「あなたはプロの編集者です」のようにClaudeに特定の立場を与える設定", category:"ai" },
+  { word:"constraint", meaning:"制約・条件", example:"Add constraints to limit the output", context:"「200字以内で」「箇条書きで」など出力を絞り込む条件のこと", category:"ai" },
+  { word:"iterate", meaning:"繰り返し改善する", example:"Iterate on your prompt to improve results", context:"最初の結果を見てプロンプトを少し変えて再試行し、徐々に精度を上げる", category:"ai" },
+  { word:"clarify", meaning:"明確にする", example:"Clarify your request if the output is wrong", context:"曖昧な指示を具体的に言い直して、Claudeが正確に答えられるようにする", category:"ai" },
+  { word:"temperature", meaning:"AIの出力のランダム性の設定値", example:"High temperature = more creative output", context:"高いと創造的・多様な答えが出て、低いと一貫した安定した答えが出る", category:"ai" },
+  { word:"skill", meaning:"スキルファイル", example:"This skill applies brand guidelines", context:"特定のタスクでClaudeがどう動くかを事前に定義した説明書のこと", category:"sk" },
+  { word:"description", meaning:"説明文", example:"Write a clear description for the skill", context:"スキルがどんな場面で使われるかをClaudeに伝えるための文章", category:"sk" },
+  { word:"trigger", meaning:"起動条件", example:"The skill trigger is the user's request", context:"どんなユーザーの依頼がきたときにこのスキルを使うかを示す条件", category:"sk" },
+  { word:"guidelines", meaning:"ガイドライン・指針", example:"Brand guidelines define colors", context:"デザインや文体など、統一したルールをまとめたもの", category:"sk" },
+  { word:"apply", meaning:"適用する", example:"Apply the style to the document", context:"スキルで定めたルールや設定を実際のファイルや出力に反映させること", category:"sk" },
+  { word:"connector", meaning:"コネクタ・連携機能", example:"Use a connector to link Google Drive", context:"ClaudeとGoogle DriveやSlackなど外部サービスを繋ぐための機能", category:"sk" },
+  { word:"license", meaning:"ライセンス・使用許諾", example:"Check the license in LICENSE.txt", context:"そのスキルや素材をどのような条件で使えるかを定めたルール", category:"sk" },
+  { word:"typography", meaning:"文字デザイン", example:"Typography defines font styles", context:"フォントの種類・サイズ・太さなど文字の見た目に関するデザインルール", category:"sk" },
+  { word:"template", meaning:"テンプレート・雛形", example:"Use a template for consistency", context:"毎回同じ形式で出力するための基本的な型や枠組み", category:"sk" },
+  { word:"fallback", meaning:"代替手段", example:"Arial is the fallback for Poppins", context:"第一候補が使えない場合に自動的に切り替わる予備の選択肢", category:"sk" },
+  { word:"overview", meaning:"概要", example:"The overview section explains the skill", context:"スキルの目的や使い方を短くまとめた冒頭の説明セクション", category:"sk" },
+  { word:"accent color", meaning:"アクセントカラー・強調色", example:"Orange is used as an accent color", context:"デザインの中で特定の要素を目立たせるために使う色", category:"sk" },
+  { word:"file", meaning:"ファイル", example:"Save your work as a file", context:"コンピュータ上に保存されたデータのひとまとまり。.mdや.pdfなど", category:"gen" },
+  { word:"folder", meaning:"フォルダ", example:"Put the file in a folder", context:"複数のファイルをまとめて管理するための入れ物", category:"gen" },
+  { word:"download", meaning:"ダウンロード", example:"Download the file to your computer", context:"インターネット上のデータを自分のコンピュータに保存すること", category:"gen" },
+  { word:"upload", meaning:"アップロード", example:"Upload a file to the cloud", context:"自分のコンピュータにあるファイルをインターネット上に送ること", category:"gen" },
+  { word:"format", meaning:"形式・フォーマット", example:"Choose the right file format", context:"データの種類や構造の形式。.mdや.pdfなどファイルの種類を指すこともある", category:"gen" },
+  { word:"extension", meaning:"拡張子", example:".md is a Markdown file extension", context:"ファイル名の末尾についてファイルの種類を示す文字列。.mdや.pdf", category:"gen" },
+  { word:"documentation", meaning:"ドキュメント・説明書", example:"Read the documentation first", context:"ツールやサービスの使い方を説明した公式の文書や資料", category:"gen" },
+  { word:"interface", meaning:"操作画面", example:"The user interface is clean", context:"ユーザーが実際に見て操作する画面やボタン・メニューのこと", category:"gen" },
+  { word:"settings", meaning:"設定", example:"Open settings to change preferences", context:"アプリやツールの動作を自分の好みに合わせて変更できる場所", category:"gen" },
+  { word:"default", meaning:"デフォルト・初期値", example:"The default font is Arial", context:"特に設定を変えなかった場合に自動的に使われる値や動作", category:"gen" },
+  { word:"version", meaning:"バージョン", example:"Check the latest version", context:"ソフトウェアや文書の更新履歴を表す番号。新しいほど数字が大きい", category:"gen" },
+  { word:"error", meaning:"エラー・間違い", example:"An error occurred in the code", context:"プログラムや操作が正しく動かないときに表示される問題の通知", category:"gen" },
+  { word:"copy", meaning:"コピーする", example:"Copy and paste the text", context:"テキストやファイルを複製して別の場所でも使えるようにすること", category:"gen" },
+  { word:"paste", meaning:"貼り付ける", example:"Paste the text into the editor", context:"コピーしたテキストやファイルを別の場所に配置すること", category:"gen" },
+  { word:"export", meaning:"書き出す・エクスポート", example:"Export the file as PDF", context:"作業中のデータを別の形式のファイルとして保存・出力すること", category:"gen" },
+  { word:"import", meaning:"読み込む・インポート", example:"Import the CSV file", context:"外部のファイルやデータをツールやアプリに取り込むこと", category:"gen" },
+  { word:"workflow", meaning:"作業の流れ", example:"Automate your workflow with AI", context:"あるタスクを完了するための一連の手順や作業プロセス全体", category:"gen" },
+  { word:"integrate", meaning:"連携する・統合する", example:"Integrate Claude with your tools", context:"複数のツールやサービスを繋げて一緒に使えるようにすること", category:"gen" },
+];
+
+const catLabel={md:"Markdown",ai:"Claude / AI",sk:"スキル",gen:"一般技術用語"};
+const catClass={md:"badge-md",ai:"badge-ai",sk:"badge-sk",gen:"badge-gen"};
+let queue=[],cur=0,score=0,activeFilter='all',step=1,meaningOk=false;
+
+function shuffle(a){return [...a].sort(()=>Math.random()-0.5);}
+function setFilter(f,btn){activeFilter=f;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');startGame();}
+function getPool(){return activeFilter==='all'?words:words.filter(w=>w.category===activeFilter);}
+function getWrong(field,correct,pool){return shuffle(pool.filter(w=>w[field]!==correct[field])).slice(0,3).map(w=>w[field]);}
+
+// 選んだ値からその単語データを逆引き
+function findWordByField(field,value){return words.find(w=>w[field]===value);}
+
+function startGame(){queue=shuffle(getPool());cur=0;score=0;showQ();}
+function showQ(){if(cur>=queue.length){showResult();return;}step=1;meaningOk=false;renderStep();}
+
+function renderStep(){
+  const q=queue[cur];
+  const pool=getPool();
+  const safePool=pool.length>=4?pool:words;
+  const pct=Math.round((cur/queue.length)*100);
+  let stepHTML='';
+  if(step===1){
+    const choices=shuffle([q.meaning,...getWrong('meaning',q,safePool)]);
+    stepHTML=`
+      <div class="step-label">STEP 1　意味を選んでください</div>
+      <div class="choices">${choices.map(c=>`<button class="cbtn" onclick="answerStep1(this,'${esc(c)}','${esc(q.meaning)}')">${c}</button>`).join('')}</div>
+      <div class="feedback" id="fb"></div>
+      <div class="explain-wrap" id="explain"></div>`;
+  } else {
+    const choices=shuffle([q.context,...getWrong('context',q,safePool)]);
+    stepHTML=`
+      ${meaningOk?`<div class="step-done ok">STEP 1 正解　${q.meaning}</div>`:`<div class="step-done ng">STEP 1 不正解　正解：${q.meaning}</div>`}
+      <div class="step-label">STEP 2　使われる場面を選んでください</div>
+      <div class="choices">${choices.map(c=>`<button class="cbtn" onclick="answerStep2(this,'${esc(c)}','${esc(q.context)}','${esc(q.meaning)}')">${c}</button>`).join('')}</div>
+      <div class="feedback" id="fb"></div>
+      <div class="explain-wrap" id="explain"></div>`;
+  }
+  document.getElementById('game-area').innerHTML=`
+    <div class="score-bar"><div><span class="score-lbl">スコア　</span><span class="score-val">${score}</span></div><div class="counter">${cur+1} / ${queue.length}</div></div>
+    <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
+    <div class="word-card"><span class="badge ${catClass[q.category]}">${catLabel[q.category]}</span><div class="word-main">${q.word}</div><div class="word-example">${q.example}</div></div>
+    ${stepHTML}
+    <button class="next-btn" id="next-btn" onclick="nextQ()">次の問題 →</button>`;
+}
+
+function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function lockBtns(){document.querySelectorAll('.cbtn').forEach(b=>b.disabled=true);}
+function markBtn(btn,correct){
+  btn.classList.add('wrong');
+  document.querySelectorAll('.cbtn').forEach(b=>{if(b.textContent.trim()===correct)b.classList.add('correct');});
+}
+
+function showExplainMeaning(chosen, correct, q){
+  const chosenWord=findWordByField('meaning',chosen);
+  const explainEl=document.getElementById('explain');
+  if(!explainEl)return;
+  explainEl.innerHTML=`
+    <div class="explain-card wrong-card">
+      <div class="explain-label wrong-label">あなたが選んだ答え</div>
+      <div class="explain-word">${chosen}${chosenWord?' ＝ '+chosenWord.word:''}</div>
+      <div class="explain-desc">${chosenWord?chosenWord.context:''}</div>
+    </div>
+    <div class="explain-card correct-card">
+      <div class="explain-label correct-label">正解</div>
+      <div class="explain-word">${correct} ＝ ${q.word}</div>
+      <div class="explain-desc">${q.context}</div>
+    </div>`;
+}
+
+function showExplainContext(chosen, correct, correctMeaning){
+  const chosenWord=findWordByField('context',chosen);
+  const correctWord=findWordByField('context',correct);
+  const explainEl=document.getElementById('explain');
+  if(!explainEl)return;
+  explainEl.innerHTML=`
+    <div class="explain-card wrong-card">
+      <div class="explain-label wrong-label">あなたが選んだ答え</div>
+      <div class="explain-word">${chosenWord?chosenWord.word+' ＝ '+chosenWord.meaning:''}</div>
+      <div class="explain-desc">${chosen}</div>
+    </div>
+    <div class="explain-card correct-card">
+      <div class="explain-label correct-label">正解</div>
+      <div class="explain-word">${correctWord?correctWord.word+' ＝ '+correctMeaning:correctMeaning}</div>
+      <div class="explain-desc">${correct}</div>
+    </div>`;
+}
+
+function answerStep1(btn,chosen,correct){
+  lockBtns();
+  const q=queue[cur];
+  const fb=document.getElementById('fb');
+  if(chosen===correct){
+    btn.classList.add('correct');
+    meaningOk=true;
+    fb.style.color='#085041';
+    fb.textContent='正解　次はこの単語が使われる場面を選んでください';
+  } else {
+    markBtn(btn,correct);
+    meaningOk=false;
+    fb.style.color='#791F1F';
+    fb.textContent='不正解';
+    showExplainMeaning(chosen,correct,q);
+  }
+  setTimeout(()=>{step=2;renderStep();},chosen===correct?700:1800);
+}
+
+function answerStep2(btn,chosen,correct,correctMeaning){
+  lockBtns();
+  const fb=document.getElementById('fb');
+  if(chosen===correct){
+    btn.classList.add('correct');
+    if(meaningOk)score++;
+    fb.style.color='#085041';
+    fb.textContent=meaningOk?'正解　両方正解でポイント獲得':'正解　ただしSTEP1が不正解のためポイントなし';
+  } else {
+    markBtn(btn,correct);
+    fb.style.color='#791F1F';
+    fb.textContent='不正解';
+    showExplainContext(chosen,correct,correctMeaning);
+  }
+  document.getElementById('next-btn').style.display='block';
+}
+
+function nextQ(){cur++;showQ();}
+
+function showResult(){
+  const pct=Math.round((score/queue.length)*100);
+  const msg=pct>=80?'すばらしい結果です':pct>=60?'もう少しで完璧です':'繰り返し練習しましょう';
+  document.getElementById('game-area').innerHTML=`
+    <div class="result-card">
+      <div class="score-lbl">最終スコア</div>
+      <div class="result-score">${score} / ${queue.length}</div>
+      <div class="result-sub">正答率 ${pct}%　（両方正解でポイント）</div>
+      <div class="result-msg">${msg}</div>
+      <button class="restart-btn" onclick="startGame()">もう一度やる</button>
+    </div>`;
+}
+startGame();
+</script>
+</body>
+</html>
