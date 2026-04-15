@@ -56,6 +56,11 @@
   .explain-label.correct-label { color: #085041; }
   .explain-word { font-weight: 500; font-size: 14px; }
   .explain-desc { color: #444; margin-top: 2px; }
+  /* 使用例カード */
+  .usage-card { background: #f4f3ef; border-radius: 12px; padding: 12px 14px; margin-bottom: 0.75rem; font-size: 13px; line-height: 1.6; display: none; }
+  .usage-label { font-size: 11px; font-weight: 500; color: #888; margin-bottom: 6px; }
+  .usage-code { font-family: 'Courier New', monospace; font-size: 14px; font-weight: 500; color: #141413; margin-bottom: 4px; }
+  .usage-context { color: #555; font-size: 13px; }
   .action-row { display: flex; gap: 8px; margin-top: 0.25rem; }
   .next-btn { flex: 1; padding: 14px; border-radius: 12px; border: none; background: #141413; color: #faf9f5; font-size: 15px; cursor: pointer; display: none; -webkit-appearance: none; }
   .to-step2-btn { flex: 1; padding: 14px; border-radius: 12px; border: 1px solid #bbb; background: #fff; color: #333; font-size: 14px; cursor: pointer; display: none; -webkit-appearance: none; }
@@ -208,6 +213,7 @@ function renderStep(){
   const pct=Math.round((cur/queue.length)*100);
   const inMemo=isInMemo(q.word);
   let stepHTML='';
+
   if(step===1){
     const choices=shuffle([q.meaning,...getWrong('meaning',q,safePool)]);
     stepHTML=`
@@ -216,9 +222,9 @@ function renderStep(){
       <div class="feedback" id="fb"></div>
       <div class="explain-wrap" id="explain"></div>
       <div class="action-row">
-        <button class="to-step2-btn" id="to-step2-btn" onclick="goToStep2()">解説を読んだ　STEP 2へ →</button>
+        <button class="to-step2-btn" id="to-step2-btn" onclick="goToStep2()">確認した　STEP 2へ →</button>
       </div>`;
-  } else {
+  } else if(step===2){
     const choices=shuffle([q.context,...getWrong('context',q,safePool)]);
     stepHTML=`
       ${meaningOk?`<div class="step-done ok">STEP 1 正解　${q.meaning}</div>`:`<div class="step-done ng">STEP 1 不正解　正解：${q.meaning}</div>`}
@@ -227,9 +233,22 @@ function renderStep(){
       <div class="feedback" id="fb"></div>
       <div class="explain-wrap" id="explain"></div>
       <div class="action-row">
-        <button class="next-btn" id="next-btn" onclick="nextQ()">次の問題 →</button>
+        <button class="to-usage-btn" id="to-usage-btn" onclick="showUsage()" style="flex:1;padding:14px;border-radius:12px;border:1px solid #bbb;background:#fff;color:#333;font-size:14px;cursor:pointer;display:none;-webkit-appearance:none;">使用例を確認する →</button>
+      </div>`;
+  } else {
+    // step===3: 使用例表示
+    stepHTML=`
+      ${meaningOk?`<div class="step-done ok">STEP 1 正解　${q.meaning}</div>`:`<div class="step-done ng">STEP 1 不正解　正解：${q.meaning}</div>`}
+      <div class="usage-card" id="usage-card" style="display:block;">
+        <div class="usage-label">使用例</div>
+        <div class="usage-code">${q.example}</div>
+        <div class="usage-context">${q.context}</div>
+      </div>
+      <div class="action-row">
+        <button class="next-btn" id="next-btn" onclick="nextQ()" style="display:block;">次の問題 →</button>
       </div>`;
   }
+
   document.getElementById('game-area').innerHTML=`
     <div class="score-bar"><div><span class="score-lbl">スコア　</span><span class="score-val">${score}</span></div><div class="counter">${cur+1} / ${queue.length}</div></div>
     <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
@@ -292,21 +311,20 @@ function answerStep1(btn,chosen,correct){
   lockBtns();
   const q=queue[cur];
   const fb=document.getElementById('fb');
+  const s2btn=document.getElementById('to-step2-btn');
   if(chosen===correct){
     btn.classList.add('correct');
     meaningOk=true;
     fb.style.color='#085041';
-    fb.textContent='正解　次はこの記号・用語が使われる場面を選んでください';
-    setTimeout(()=>{step=2;renderStep();},700);
+    fb.textContent='正解';
   } else {
     markBtn(btn,correct);
     meaningOk=false;
     fb.style.color='#791F1F';
     fb.textContent='不正解　解説を確認してからSTEP 2へ進んでください';
     showExplainMeaning(chosen,correct,q);
-    const s2=document.getElementById('to-step2-btn');
-    if(s2)s2.style.display='block';
   }
+  if(s2btn)s2btn.style.display='block';
 }
 
 function goToStep2(){step=2;renderStep();}
@@ -314,6 +332,7 @@ function goToStep2(){step=2;renderStep();}
 function answerStep2(btn,chosen,correct,correctMeaning){
   lockBtns();
   const fb=document.getElementById('fb');
+  const usageBtn=document.getElementById('to-usage-btn');
   if(chosen===correct){
     btn.classList.add('correct');
     if(meaningOk)score++;
@@ -325,9 +344,10 @@ function answerStep2(btn,chosen,correct,correctMeaning){
     fb.textContent='不正解';
     showExplainContext(chosen,correct,correctMeaning);
   }
-  const nb=document.getElementById('next-btn');
-  if(nb)nb.style.display='block';
+  if(usageBtn)usageBtn.style.display='block';
 }
+
+function showUsage(){step=3;renderStep();}
 
 function nextQ(){cur++;showQ();}
 
